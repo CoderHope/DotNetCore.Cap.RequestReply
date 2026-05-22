@@ -18,9 +18,7 @@ public interface IReplyTransport
     /// <param name="context">请求上下文。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>可写入 Header 的回复地址。</returns>
-    Task<ReplyAddress> CreateReplyAddressAsync(
-        RequestContext context,
-        CancellationToken cancellationToken = default);
+    Task<ReplyAddress> CreateReplyAddressAsync(RequestContext context, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 将响应写入指定回复地址。
@@ -29,10 +27,7 @@ public interface IReplyTransport
     /// <param name="address">回复地址。</param>
     /// <param name="reply">响应信封。</param>
     /// <param name="cancellationToken">取消令牌。</param>
-    Task SendAsync<TResponse>(
-        ReplyAddress address,
-        ReplyEnvelope<TResponse> reply,
-        CancellationToken cancellationToken = default);
+    Task SendAsync<TResponse>(ReplyAddress address, ReplyEnvelope<TResponse> reply, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 等待当前请求的响应。
@@ -42,8 +37,5 @@ public interface IReplyTransport
     /// <param name="timeout">等待超时时间。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>响应信封。</returns>
-    Task<ReplyEnvelope<TResponse>> WaitAsync<TResponse>(
-        RequestContext context,
-        TimeSpan timeout,
-        CancellationToken cancellationToken = default);
+    Task<ReplyEnvelope<TResponse>> WaitAsync<TResponse>(RequestContext context, TimeSpan timeout, CancellationToken cancellationToken = default);
 }

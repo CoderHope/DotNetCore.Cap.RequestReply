@@ -15,9 +15,5 @@ public interface ICapRequestBus
     /// <param name="timeout">本次请求超时时间；为空时使用默认配置。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>响应数据。</returns>
-    Task<TResponse> RequestAsync<TRequest, TResponse>(
-        string topic,
-        TRequest request,
-        TimeSpan? timeout = null,
-        CancellationToken cancellationToken = default);
+    Task<TResponse> RequestAsync<TRequest, TResponse>(string topic, TRequest request, TimeSpan? timeout = null, CancellationToken cancellationToken = default);
 }

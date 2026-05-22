@@ -14,10 +14,6 @@ public interface ICapRequestPublisher
     /// <param name="headers">随请求写入的 CAP Header。</param>
     /// <param name="callbackName">CAP callbackName；非 callback 模式为空。</param>
     /// <param name="cancellationToken">取消令牌。</param>
-    Task PublishAsync<TMessage>(
-        string topic,
-        TMessage message,
-        IReadOnlyDictionary<string, string> headers,
-        string? callbackName,
+    Task PublishAsync<TMessage>(string topic, TMessage message, IReadOnlyDictionary<string, string> headers, string? callbackName,
         CancellationToken cancellationToken = default);
 }
