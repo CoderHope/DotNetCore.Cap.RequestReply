@@ -6,7 +6,7 @@ namespace DotNetCore.Cap.RequestReply.Models;
 public sealed class RequestReplyOptions
 {
     /// <summary>
-    /// 当前服务名，用于生成 ReplyTo 地址和 callback topic。
+    /// 当前服务名，用于生成 ReplyTo 地址。
     /// </summary>
     public string ServiceName { get; set; } = AppDomain.CurrentDomain.FriendlyName;
 

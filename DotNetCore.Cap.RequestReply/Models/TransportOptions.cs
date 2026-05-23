@@ -6,7 +6,7 @@ namespace DotNetCore.Cap.RequestReply.Models;
 public sealed class RedisReplyOptions
 {
     /// <summary>
-    /// Redis 逻辑端点名称，会写入 ReplyTo；连接串仍保留在本地配置中。
+    /// 当前服务作为请求方时写入 ReplyTo 的 Redis 逻辑端点名称；连接串仍保留在本地配置中。
     /// </summary>
     public string EndpointName { get; set; } = "default";
 
@@ -14,6 +14,24 @@ public sealed class RedisReplyOptions
     /// Redis 连接串。
     /// </summary>
     public string ConnectionString { get; set; } = "localhost:6379";
+
+    /// <summary>
+    /// 额外 Redis 逻辑端点映射。用于消费端把请求消息中的远端 endpoint 名称解析到本地连接串。
+    /// </summary>
+    public IDictionary<string, string> Endpoints { get; } = new Dictionary<string, string>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// 添加 Redis 逻辑端点映射。
+    /// </summary>
+    /// <param name="endpointName">请求消息 ReplyTo 中携带的逻辑端点名称。</param>
+    /// <param name="connectionString">本服务用于连接该端点的 Redis 连接串。</param>
+    public void AddEndpoint(string endpointName, string connectionString)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpointName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+
+        Endpoints[endpointName] = connectionString;
+    }
 
     /// <summary>
     /// Reply Stream 名称前缀。
@@ -103,6 +121,21 @@ public sealed class PostgreSqlStoreOptions
     /// PostgreSQL 连接串。
     /// </summary>
     public string ConnectionString { get; set; } = string.Empty;
+
+    /// <summary>
+    /// PostgreSQL schema 名称，默认与 CAP PostgreSQL 存储一致使用 cap。
+    /// </summary>
+    public string Schema { get; set; } = "cap";
+
+    /// <summary>
+    /// PendingRequest 表名。
+    /// </summary>
+    public string TableName { get; set; } = "request_reply";
+
+    /// <summary>
+    /// 是否在首次使用时自动创建表。
+    /// </summary>
+    public bool AutoCreateTable { get; set; } = true;
 }
 
 /// <summary>
@@ -114,4 +147,19 @@ public sealed class MySqlStoreOptions
     /// MySQL 连接串。
     /// </summary>
     public string ConnectionString { get; set; } = string.Empty;
+
+    /// <summary>
+    /// MySQL 表名前缀，默认与 CAP MySQL 存储一致使用 cap。
+    /// </summary>
+    public string TableNamePrefix { get; set; } = "cap";
+
+    /// <summary>
+    /// PendingRequest 表名。
+    /// </summary>
+    public string TableName { get; set; } = "request_reply";
+
+    /// <summary>
+    /// 是否在首次使用时自动创建表。
+    /// </summary>
+    public bool AutoCreateTable { get; set; } = true;
 }
