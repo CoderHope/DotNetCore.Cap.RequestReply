@@ -38,4 +38,11 @@ public interface IReplyTransport
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>响应信封。</returns>
     Task<ReplyEnvelope<TResponse>> WaitAsync<TResponse>(RequestContext context, TimeSpan timeout, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 在调用方超时或取消时清理回复通道中的等待状态或孤儿数据。
+    /// </summary>
+    /// <param name="context">请求上下文。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    Task AbandonAsync(RequestContext context, CancellationToken cancellationToken = default);
 }

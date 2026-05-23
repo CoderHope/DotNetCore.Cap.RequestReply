@@ -34,8 +34,8 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IRequestSerializer, SystemTextJsonRequestSerializer>();
         services.TryAddSingleton<IRequestIdGenerator, DefaultRequestIdGenerator>();
         services.TryAddSingleton<ICorrelationIdProvider, DefaultCorrelationIdProvider>();
-        services.TryAddSingleton<IRequestReplyDiagnostics, NoopRequestReplyDiagnostics>();
         services.TryAddSingleton<IRedisConnectionProvider, DefaultRedisConnectionProvider>();
+        services.AddSingleton(CreateDiagnostics);
 
         services.AddSingleton(CreateRequestStore);
         services.AddSingleton(CreateReplyTransport);
@@ -49,6 +49,14 @@ public static class ServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ISubscribeFilter, CapRequestReplySubscribeFilter>());
 
         return services;
+    }
+
+    private static IRequestReplyDiagnostics CreateDiagnostics(IServiceProvider serviceProvider)
+    {
+        var options = serviceProvider.GetRequiredService<IOptions<RequestReplyOptions>>().Value;
+        return options.EnableOpenTelemetryDiagnostics
+            ? new OpenTelemetryRequestReplyDiagnostics()
+            : new NoopRequestReplyDiagnostics();
     }
 
     private static IRequestStore CreateRequestStore(IServiceProvider serviceProvider)

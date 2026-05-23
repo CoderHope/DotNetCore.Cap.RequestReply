@@ -31,6 +31,11 @@ public sealed class RequestReplyOptions
     public RequestReplyStoreKind RequestStore { get; private set; } = RequestReplyStoreKind.InMemory;
 
     /// <summary>
+    /// 是否使用 OpenTelemetry 诊断实现。
+    /// </summary>
+    public bool EnableOpenTelemetryDiagnostics { get; private set; }
+
+    /// <summary>
     /// Redis ReplyTransport 配置。
     /// </summary>
     public RedisReplyOptions Redis { get; } = new();
@@ -54,6 +59,77 @@ public sealed class RequestReplyOptions
     /// MySQL PendingRequestStore 配置。
     /// </summary>
     public MySqlStoreOptions MySqlStore { get; } = new();
+
+    /// <summary>
+    /// 使用进程内 Request/Reply（InMemory Reply + InMemory Store）。
+    /// </summary>
+    public void UseInMemoryRequestReply()
+    {
+        UseInMemoryReply();
+        UseInMemoryStore();
+    }
+
+    /// <summary>
+    /// 使用 Redis Reply + InMemory Store。
+    /// </summary>
+    /// <param name="configureRedis">Redis 配置委托。</param>
+    public void UseRedisRequestReply(Action<RedisReplyOptions>? configureRedis = null)
+    {
+        UseRedisReply(configureRedis);
+        UseInMemoryStore();
+    }
+
+    /// <summary>
+    /// 使用 PostgreSQL Reply + PostgreSQL Store（共享连接串与 Schema）。
+    /// </summary>
+    /// <param name="configure">PostgreSQL 配置委托。</param>
+    public void UsePostgreSqlRequestReply(Action<PostgreSqlReplyOptions>? configure = null)
+    {
+        UsePostgreSqlReply(options =>
+        {
+            configure?.Invoke(options);
+            if (!string.IsNullOrWhiteSpace(options.ConnectionString))
+            {
+                PostgreSqlStore.ConnectionString = options.ConnectionString;
+            }
+
+            if (!string.IsNullOrWhiteSpace(options.Schema))
+            {
+                PostgreSqlStore.Schema = options.Schema;
+            }
+        });
+        UsePostgreSqlStore();
+    }
+
+    /// <summary>
+    /// 使用 MySQL Reply + MySQL Store（共享连接串）。
+    /// </summary>
+    /// <param name="configure">MySQL 配置委托。</param>
+    public void UseMySqlRequestReply(Action<MySqlReplyOptions>? configure = null)
+    {
+        UseMySqlReply(options =>
+        {
+            configure?.Invoke(options);
+            if (!string.IsNullOrWhiteSpace(options.ConnectionString))
+            {
+                MySqlStore.ConnectionString = options.ConnectionString;
+            }
+
+            if (!string.IsNullOrWhiteSpace(options.TableNamePrefix))
+            {
+                MySqlStore.TableNamePrefix = options.TableNamePrefix;
+            }
+        });
+        UseMySqlStore();
+    }
+
+    /// <summary>
+    /// 启用 OpenTelemetry 诊断（<see cref="Core.OpenTelemetryRequestReplyDiagnostics"/>）。
+    /// </summary>
+    public void UseOpenTelemetryDiagnostics()
+    {
+        EnableOpenTelemetryDiagnostics = true;
+    }
 
     /// <summary>
     /// 使用进程内响应通道。

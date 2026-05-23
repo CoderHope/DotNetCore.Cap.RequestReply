@@ -25,6 +25,11 @@ public sealed class NoopRequestReplyDiagnostics : IRequestReplyDiagnostics
     }
 
     /// <inheritdoc />
+    public void MarkCanceled(RequestContext context)
+    {
+    }
+
+    /// <inheritdoc />
     public void MarkFailed(RequestContext context, Exception exception)
     {
     }

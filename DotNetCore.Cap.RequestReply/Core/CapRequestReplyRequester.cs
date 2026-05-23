@@ -102,19 +102,6 @@ internal sealed class CapRequestReplyRequester : ICapRequestReplyRequester
             ExpiresAt = context.ExpiresAt,
             CreatedAt = context.CreatedAt
         };
-        await _requestStore.CreateAsync(pendingRequest, cancellationToken).ConfigureAwait(false);
-        if (_logger.IsEnabled(LogLevel.Debug))
-        {
-            _logger.LogDebug(
-                "CAP request created. requestId={RequestId} correlationId={CorrelationId} topic={Topic} replyTo={ReplyTo} transport={Transport} status={Status}",
-                context.RequestId,
-                context.CorrelationId,
-                context.Topic,
-                context.ReplyTo,
-                context.TransportName,
-                PendingRequestStatus.Pending);
-        }
-
         var envelope = new RequestEnvelope<TRequest>(context.RequestId, context.CorrelationId, context.ReplyTo, context.ExpiresAt, request);
         var headers = RequestReplyHeaders.Create<TRequest, TResponse>(context);
         var capHeaders = headers.ToDictionary(static item => item.Key,
@@ -122,29 +109,42 @@ internal sealed class CapRequestReplyRequester : ICapRequestReplyRequester
 
         try
         {
-            await capPublisher.PublishAsync(topic, envelope, capHeaders, cancellationToken)
-                .ConfigureAwait(false);
+            await _requestStore.CreateAsync(pendingRequest, cancellationToken).ConfigureAwait(false);
             if (_logger.IsEnabled(LogLevel.Debug))
             {
                 _logger.LogDebug(
-                    "CAP request published. requestId={RequestId} correlationId={CorrelationId} topic={Topic} replyTo={ReplyTo} transport={Transport}",
+                    "CAP request created. requestId={RequestId} correlationId={CorrelationId} topic={Topic} replyTo={ReplyTo} transport={Transport} status={Status}",
                     context.RequestId,
                     context.CorrelationId,
                     context.Topic,
                     context.ReplyTo,
-                    context.TransportName);
+                    context.TransportName,
+                    PendingRequestStatus.Pending);
             }
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            await _requestStore.MarkFailedAsync(context.RequestId, "PUBLISH_FAILED", exception.Message, cancellationToken)
-                .ConfigureAwait(false);
-            _diagnostics.MarkFailed(context, exception);
-            throw;
-        }
 
-        try
-        {
+            try
+            {
+                await capPublisher.PublishAsync(topic, envelope, capHeaders, cancellationToken)
+                    .ConfigureAwait(false);
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug(
+                        "CAP request published. requestId={RequestId} correlationId={CorrelationId} topic={Topic} replyTo={ReplyTo} transport={Transport}",
+                        context.RequestId,
+                        context.CorrelationId,
+                        context.Topic,
+                        context.ReplyTo,
+                        context.TransportName);
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                await _requestStore.MarkFailedAsync(context.RequestId, "PUBLISH_FAILED", exception.Message, cancellationToken)
+                    .ConfigureAwait(false);
+                _diagnostics.MarkFailed(context, exception);
+                throw;
+            }
+
             var reply = await _replyTransport.WaitAsync<TResponse>(context, effectiveTimeout, cancellationToken)
                 .ConfigureAwait(false);
             if (!string.Equals(reply.RequestId, context.RequestId, StringComparison.Ordinal))
@@ -198,12 +198,31 @@ internal sealed class CapRequestReplyRequester : ICapRequestReplyRequester
             await MarkTimeoutAsync(context, startedAt, CancellationToken.None).ConfigureAwait(false);
             throw new RequestTimeoutException(context.RequestId, effectiveTimeout);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await _requestStore.MarkCanceledAsync(context.RequestId, cancellationToken).ConfigureAwait(false);
+            await _replyTransport.AbandonAsync(context, CancellationToken.None).ConfigureAwait(false);
+            _diagnostics.MarkCanceled(context);
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug(
+                    "CAP request canceled. requestId={RequestId} correlationId={CorrelationId} topic={Topic} replyTo={ReplyTo} transport={Transport} status={Status} elapsedMs={ElapsedMs}",
+                    context.RequestId,
+                    context.CorrelationId,
+                    context.Topic,
+                    context.ReplyTo,
+                    context.TransportName,
+                    PendingRequestStatus.Canceled,
+                    Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            }
+            throw;
+        }
     }
-
-
+    
     private async Task MarkTimeoutAsync(RequestContext context, long startedAt, CancellationToken cancellationToken)
     {
         await _requestStore.MarkTimeoutAsync(context.RequestId, cancellationToken).ConfigureAwait(false);
+        await _replyTransport.AbandonAsync(context, CancellationToken.None).ConfigureAwait(false);
         _diagnostics.MarkTimeout(context);
         _logger.LogWarning(
             "CAP request timed out. requestId={RequestId} correlationId={CorrelationId} topic={Topic} replyTo={ReplyTo} transport={Transport} status={Status} elapsedMs={ElapsedMs}",

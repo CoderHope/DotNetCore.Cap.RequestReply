@@ -26,7 +26,7 @@ public enum PendingRequestStatus
     Timeout = 3,
 
     /// <summary>
-    /// 请求被调用方取消。
+    /// 调用方通过 <see cref="CancellationToken"/> 主动取消等待。
     /// </summary>
     Canceled = 4,
 

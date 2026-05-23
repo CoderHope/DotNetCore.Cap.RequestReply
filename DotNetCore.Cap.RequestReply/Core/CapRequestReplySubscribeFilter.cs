@@ -1,7 +1,9 @@
+using System.Reflection;
 using DotNetCore.CAP.Filter;
 using DotNetCore.CAP.Messages;
 using DotNetCore.Cap.RequestReply.Abstractions;
 using DotNetCore.Cap.RequestReply.Models;
+using Microsoft.Extensions.Logging;
 
 namespace DotNetCore.Cap.RequestReply.Core;
 
@@ -13,21 +15,29 @@ public sealed class CapRequestReplySubscribeFilter : SubscribeFilter
     private static readonly string HandlerExceptionCode = "HANDLER_EXCEPTION";
     private readonly IReplyTransport _replyTransport;
     private readonly IRequestStore _requestStore;
+    private readonly ILogger<CapRequestReplySubscribeFilter> _logger;
 
     /// <summary>
     /// 创建自动响应过滤器。
     /// </summary>
-    /// <param name="replyTransport">响应通道。</param>
-    /// <param name="requestStore">请求状态存储。</param>
-    public CapRequestReplySubscribeFilter(IReplyTransport replyTransport, IRequestStore requestStore)
+    public CapRequestReplySubscribeFilter(
+        IReplyTransport replyTransport,
+        IRequestStore requestStore,
+        ILogger<CapRequestReplySubscribeFilter> logger)
     {
         _replyTransport = replyTransport;
         _requestStore = requestStore;
+        _logger = logger;
     }
 
     /// <inheritdoc />
     public override async Task OnSubscribeExecutedAsync(ExecutedContext context)
     {
+        if (!IsCapRequestReplyHandler(context))
+        {
+            return;
+        }
+
         var request = TryGetRequestEnvelope(context.DeliverMessage);
         if (request is null)
         {
@@ -40,12 +50,17 @@ public sealed class CapRequestReplySubscribeFilter : SubscribeFilter
             : CreateReplyEnvelope(responseType, request, true, context.Result, null, null);
 
         context.Result = reply;
-        await SendReplyIfNeededAsync(responseType, request, reply).ConfigureAwait(false);
+        await SendReplyIfNeededAsync(responseType, request, reply, context.DeliverMessage.Headers).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public override async Task OnSubscribeExceptionAsync(ExceptionContext context)
     {
+        if (!IsCapRequestReplyHandler(context))
+        {
+            return;
+        }
+
         var request = TryGetRequestEnvelope(context.DeliverMessage);
         if (request is null)
         {
@@ -63,24 +78,48 @@ public sealed class CapRequestReplySubscribeFilter : SubscribeFilter
 
         context.Result = reply;
         context.ExceptionHandled = true;
-        await SendReplyIfNeededAsync(responseType, request, reply).ConfigureAwait(false);
+        await SendReplyIfNeededAsync(responseType, request, reply, context.DeliverMessage.Headers).ConfigureAwait(false);
     }
 
-    private static IRequestEnvelope? TryGetRequestEnvelope(Message message)
+    private static bool IsCapRequestReplyHandler(FilterContext context)
+    {
+        return context.ConsumerDescriptor.MethodInfo.GetCustomAttribute<CapRequestReplyAttribute>(inherit: true) is not null;
+    }
+
+    private IRequestEnvelope? TryGetRequestEnvelope(Message message)
     {
         return message.Value is IRequestEnvelope request && HasRequestReplyHeaders(message.Headers, request)
             ? request
             : null;
     }
 
-    private static bool HasRequestReplyHeaders(IDictionary<string, string?> headers, IRequestEnvelope request)
+    private bool HasRequestReplyHeaders(IDictionary<string, string?> headers, IRequestEnvelope request)
     {
-        return HeaderEquals(headers, RequestReplyHeaders.RequestId, request.RequestId) &&
-               HeaderEquals(headers, RequestReplyHeaders.CorrelationId, request.CorrelationId) &&
-               HeaderEquals(headers, RequestReplyHeaders.ReplyTo, request.ReplyTo) &&
-               headers.ContainsKey(RequestReplyHeaders.ReplyTransport) &&
-               headers.ContainsKey(RequestReplyHeaders.RequestType) &&
-               headers.ContainsKey(RequestReplyHeaders.ResponseType);
+        if (!HeaderEquals(headers, RequestReplyHeaders.RequestId, request.RequestId) ||
+            !HeaderEquals(headers, RequestReplyHeaders.CorrelationId, request.CorrelationId) ||
+            !HeaderEquals(headers, RequestReplyHeaders.ReplyTo, request.ReplyTo) ||
+            !headers.TryGetValue(RequestReplyHeaders.ReplyTransport, out _) ||
+            !headers.TryGetValue(RequestReplyHeaders.RequestType, out _) ||
+            !headers.TryGetValue(RequestReplyHeaders.ResponseType, out _))
+        {
+            return false;
+        }
+
+        if (!headers.TryGetValue(RequestReplyHeaders.EnvelopeVersion, out var version) ||
+            !string.Equals(version, RequestReplyHeaders.CurrentEnvelopeVersion, StringComparison.Ordinal))
+        {
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug(
+                    "Request/Reply headers rejected: envelope version missing or unsupported. requestId={RequestId} version={Version}",
+                    request.RequestId,
+                    version);
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     private static bool HeaderEquals(IDictionary<string, string?> headers, string name, string expectedValue)
@@ -89,8 +128,25 @@ public sealed class CapRequestReplySubscribeFilter : SubscribeFilter
                string.Equals(value, expectedValue, StringComparison.Ordinal);
     }
 
-    private async Task SendReplyIfNeededAsync(Type responseType, IRequestEnvelope request, object reply)
+    private async Task SendReplyIfNeededAsync(
+        Type responseType,
+        IRequestEnvelope request,
+        object reply,
+        IDictionary<string, string?> headers)
     {
+        if (request.ExpiresAt < DateTimeOffset.UtcNow)
+        {
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug(
+                    "Request/Reply reply skipped: request expired. requestId={RequestId} expiresAt={ExpiresAt}",
+                    request.RequestId,
+                    request.ExpiresAt);
+            }
+
+            return;
+        }
+
         var pending = await _requestStore.GetAsync(request.RequestId).ConfigureAwait(false);
         if (pending is { Status: not PendingRequestStatus.Pending and not PendingRequestStatus.Timeout })
         {
@@ -107,7 +163,7 @@ public sealed class CapRequestReplySubscribeFilter : SubscribeFilter
             .MakeGenericMethod(responseType);
         var task = method.Invoke(
             _replyTransport,
-            new[] { ReplyAddress.Parse(request.ReplyTo), reply, CancellationToken.None });
+            [ReplyAddress.Parse(request.ReplyTo), reply, CancellationToken.None]);
 
         return task as Task
                ?? throw new InvalidOperationException("Reply transport SendAsync did not return a task.");

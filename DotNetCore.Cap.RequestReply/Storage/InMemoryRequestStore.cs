@@ -6,6 +6,7 @@ namespace DotNetCore.Cap.RequestReply.Storage;
 
 /// <summary>
 /// 基于进程内内存的 PendingRequestStore，主要用于本地开发和单元测试。
+/// 进入终态后会从内存中移除条目，避免字典无限增长。
 /// </summary>
 public sealed class InMemoryRequestStore : IRequestStore
 {
@@ -49,6 +50,7 @@ public sealed class InMemoryRequestStore : IRequestStore
                 request.Status = PendingRequestStatus.CompletedAfterTimeout;
                 request.ResponseBody = responseBody;
                 request.CompletedAt = DateTimeOffset.UtcNow;
+                RemoveIfTerminal(requestId, request.Status);
                 return Task.CompletedTask;
             }
 
@@ -60,13 +62,15 @@ public sealed class InMemoryRequestStore : IRequestStore
             request.Status = PendingRequestStatus.Completed;
             request.ResponseBody = responseBody;
             request.CompletedAt = DateTimeOffset.UtcNow;
+            RemoveIfTerminal(requestId, request.Status);
         }
 
         return Task.CompletedTask;
     }
 
     /// <inheritdoc />
-    public Task MarkFailedAsync(string requestId, string errorCode, string errorMessage, CancellationToken cancellationToken = default)
+    public Task MarkFailedAsync(string requestId, string errorCode, string errorMessage,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -83,6 +87,7 @@ public sealed class InMemoryRequestStore : IRequestStore
                 request.ErrorCode = errorCode;
                 request.ErrorMessage = errorMessage;
                 request.CompletedAt = DateTimeOffset.UtcNow;
+                RemoveIfTerminal(requestId, request.Status);
                 return Task.CompletedTask;
             }
 
@@ -95,6 +100,7 @@ public sealed class InMemoryRequestStore : IRequestStore
             request.ErrorCode = errorCode;
             request.ErrorMessage = errorMessage;
             request.CompletedAt = DateTimeOffset.UtcNow;
+            RemoveIfTerminal(requestId, request.Status);
         }
 
         return Task.CompletedTask;
@@ -111,6 +117,25 @@ public sealed class InMemoryRequestStore : IRequestStore
                 request.Status == PendingRequestStatus.Pending)
             {
                 request.Status = PendingRequestStatus.Timeout;
+                RemoveIfTerminal(requestId, request.Status);
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task MarkCanceledAsync(string requestId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_gate)
+        {
+            if (_requests.TryGetValue(requestId, out var request) &&
+                request.Status == PendingRequestStatus.Pending)
+            {
+                request.Status = PendingRequestStatus.Canceled;
+                RemoveIfTerminal(requestId, request.Status);
             }
         }
 
@@ -127,6 +152,18 @@ public sealed class InMemoryRequestStore : IRequestStore
             return Task.FromResult(_requests.TryGetValue(requestId, out var request)
                 ? request.Clone()
                 : null);
+        }
+    }
+
+    private void RemoveIfTerminal(string requestId, PendingRequestStatus status)
+    {
+        if (status is PendingRequestStatus.Completed
+            or PendingRequestStatus.Failed
+            or PendingRequestStatus.Timeout
+            or PendingRequestStatus.Canceled
+            or PendingRequestStatus.CompletedAfterTimeout)
+        {
+            _requests.TryRemove(requestId, out _);
         }
     }
 }

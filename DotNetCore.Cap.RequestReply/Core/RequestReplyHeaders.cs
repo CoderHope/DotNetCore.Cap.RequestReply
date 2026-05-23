@@ -49,6 +49,16 @@ public static class RequestReplyHeaders
     public const string TimeoutMs = "cap-request-reply-timeout-ms";
 
     /// <summary>
+    /// 信封版本 Header。
+    /// </summary>
+    public const string EnvelopeVersion = "cap-request-reply-envelope-version";
+
+    /// <summary>
+    /// 当前支持的信封版本。
+    /// </summary>
+    public const string CurrentEnvelopeVersion = "1";
+
+    /// <summary>
     /// 基于请求上下文创建 CAP Header。
     /// </summary>
     /// <typeparam name="TRequest">请求数据类型。</typeparam>
@@ -67,7 +77,8 @@ public static class RequestReplyHeaders
             [RequestType] = FormatTypeName(typeof(TRequest)),
             [ResponseType] = FormatTypeName(typeof(TResponse)),
             [ExpiresAt] = context.ExpiresAt.UtcDateTime.ToString("O"),
-            [TimeoutMs] = ((long)context.Timeout.TotalMilliseconds).ToString()
+            [TimeoutMs] = ((long)context.Timeout.TotalMilliseconds).ToString(),
+            [EnvelopeVersion] = CurrentEnvelopeVersion
         };
     }
 

@@ -17,7 +17,6 @@ public sealed class RedisStreamReplyTransport : IReplyTransport
     private const string PayloadField = "payload";
 
     private readonly IRedisConnectionProvider _connectionProvider;
-    private readonly IRequestStore _requestStore;
     private readonly IRequestSerializer _serializer;
     private readonly RequestReplyOptions _options;
     private readonly ILogger<RedisStreamReplyTransport> _logger;
@@ -25,16 +24,13 @@ public sealed class RedisStreamReplyTransport : IReplyTransport
     /// <summary>
     /// 创建 Redis Streams 响应通道。
     /// </summary>
-    /// <param name="connectionProvider">Redis 连接提供器。</param>
-    /// <param name="requestStore">请求状态存储。</param>
-    /// <param name="serializer">序列化器。</param>
-    /// <param name="options">全局配置。</param>
-    /// <param name="logger">日志记录器。</param>
-    public RedisStreamReplyTransport(IRedisConnectionProvider connectionProvider, IRequestStore requestStore, IRequestSerializer serializer,
-        IOptions<RequestReplyOptions> options, ILogger<RedisStreamReplyTransport> logger)
+    public RedisStreamReplyTransport(
+        IRedisConnectionProvider connectionProvider,
+        IRequestSerializer serializer,
+        IOptions<RequestReplyOptions> options,
+        ILogger<RedisStreamReplyTransport> logger)
     {
         _connectionProvider = connectionProvider;
-        _requestStore = requestStore;
         _serializer = serializer;
         _options = options.Value;
         _logger = logger;
@@ -47,7 +43,6 @@ public sealed class RedisStreamReplyTransport : IReplyTransport
     public Task<ReplyAddress> CreateReplyAddressAsync(RequestContext context, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        // ReplyTo 使用逻辑 endpoint 名称，不把 Redis 连接串或凭据写入 CAP Header。
         return Task.FromResult(new ReplyAddress("redis", $"{_options.Redis.EndpointName}/{BuildStreamName()}"));
     }
 
@@ -88,15 +83,12 @@ public sealed class RedisStreamReplyTransport : IReplyTransport
                 exception);
         }
 
-        await MarkStoreAsync(reply, payload, cancellationToken).ConfigureAwait(false);
-
         _logger.LogInformation(
-            "Redis reply sent. requestId={RequestId} correlationId={CorrelationId} replyTo={ReplyTo} transport={Transport} status={Status}",
+            "Redis reply sent. requestId={RequestId} correlationId={CorrelationId} replyTo={ReplyTo} transport={Transport}",
             reply.RequestId,
             reply.CorrelationId,
             address,
-            Name,
-            reply.Success ? PendingRequestStatus.Completed : PendingRequestStatus.Failed);
+            Name);
     }
 
     /// <inheritdoc />
@@ -118,12 +110,6 @@ public sealed class RedisStreamReplyTransport : IReplyTransport
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var pendingReply = await TryReadReplyFromStoreAsync<TResponse>(context, cancellationToken)
-                .ConfigureAwait(false);
-            if (pendingReply is not null)
-            {
-                return pendingReply;
-            }
 
             var remaining = deadline - DateTimeOffset.UtcNow;
             if (remaining <= TimeSpan.Zero)
@@ -178,6 +164,13 @@ public sealed class RedisStreamReplyTransport : IReplyTransport
         }
     }
 
+    /// <inheritdoc />
+    public Task AbandonAsync(RequestContext context, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
     private async Task RefreshStreamKeyExpireAsync(IDatabase database, string streamName, CancellationToken cancellationToken)
     {
         var expire = _options.Redis.StreamKeyExpire;
@@ -223,58 +216,6 @@ public sealed class RedisStreamReplyTransport : IReplyTransport
         return new RedisReplyTarget(endpointName, streamName);
     }
 
-    private async Task MarkStoreAsync<TResponse>(ReplyEnvelope<TResponse> reply, string payload, CancellationToken cancellationToken)
-    {
-        if (reply.Success)
-        {
-            await _requestStore.MarkCompletedAsync(reply.RequestId, payload, cancellationToken)
-                .ConfigureAwait(false);
-            return;
-        }
-
-        await _requestStore.MarkFailedAsync(
-                reply.RequestId,
-                reply.ErrorCode ?? "REQUEST_FAILED",
-                reply.ErrorMessage ?? "Request handler returned a failure reply.",
-                cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    private async Task<ReplyEnvelope<TResponse>?> TryReadReplyFromStoreAsync<TResponse>(RequestContext context, CancellationToken cancellationToken)
-    {
-        var pending = await _requestStore.GetAsync(context.RequestId, cancellationToken).ConfigureAwait(false);
-        if (pending is null)
-        {
-            return null;
-        }
-
-        if (pending.Status == PendingRequestStatus.Completed ||
-            pending.Status == PendingRequestStatus.CompletedAfterTimeout)
-        {
-            if (string.IsNullOrWhiteSpace(pending.ResponseBody))
-            {
-                return null;
-            }
-
-            return _serializer.Deserialize<ReplyEnvelope<TResponse>>(pending.ResponseBody)
-                   ?? throw new ReplyTransportException(
-                       $"Pending request '{context.RequestId}' response body cannot be deserialized.");
-        }
-
-        if (pending.Status == PendingRequestStatus.Failed)
-        {
-            return new ReplyEnvelope<TResponse>(
-                context.RequestId,
-                context.CorrelationId,
-                false,
-                default,
-                pending.ErrorCode,
-                pending.ErrorMessage);
-        }
-
-        return null;
-    }
-
     private async Task<IReadOnlyList<RedisStreamEntry>> ReadStreamAsync(IDatabase database, string streamName, RedisValue lastId, TimeSpan block,
         CancellationToken cancellationToken)
     {
@@ -302,12 +243,7 @@ public sealed class RedisStreamReplyTransport : IReplyTransport
                 exception);
         }
 
-        if (result.IsNull)
-        {
-            return Array.Empty<RedisStreamEntry>();
-        }
-
-        return ParseReadResult(result);
+        return result.IsNull ? [] : ParseReadResult(result);
     }
 
     private static IReadOnlyList<RedisStreamEntry> ParseReadResult(RedisResult result)
@@ -315,7 +251,7 @@ public sealed class RedisStreamReplyTransport : IReplyTransport
         var streamResults = (RedisResult[]?)result;
         if (streamResults is null)
         {
-            return Array.Empty<RedisStreamEntry>();
+            return [];
         }
 
         var entries = new List<RedisStreamEntry>();

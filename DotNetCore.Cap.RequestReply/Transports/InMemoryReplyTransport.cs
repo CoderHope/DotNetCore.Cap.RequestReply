@@ -12,20 +12,14 @@ public sealed class InMemoryReplyTransport : IReplyTransport
 {
     private readonly ConcurrentDictionary<string, TaskCompletionSource<object>> _waiters = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, object> _completedReplies = new(StringComparer.Ordinal);
-    private readonly IRequestStore _requestStore;
-    private readonly IRequestSerializer _serializer;
     private readonly ILogger<InMemoryReplyTransport> _logger;
 
     /// <summary>
     /// 创建内存响应通道。
     /// </summary>
-    /// <param name="requestStore">请求状态存储。</param>
-    /// <param name="serializer">序列化器。</param>
     /// <param name="logger">日志记录器。</param>
-    public InMemoryReplyTransport(IRequestStore requestStore, IRequestSerializer serializer, ILogger<InMemoryReplyTransport> logger)
+    public InMemoryReplyTransport(ILogger<InMemoryReplyTransport> logger)
     {
-        _requestStore = requestStore;
-        _serializer = serializer;
         _logger = logger;
     }
 
@@ -40,30 +34,14 @@ public sealed class InMemoryReplyTransport : IReplyTransport
     }
 
     /// <inheritdoc />
-    public async Task SendAsync<TResponse>(ReplyAddress address, ReplyEnvelope<TResponse> reply, CancellationToken cancellationToken = default)
+    public Task SendAsync<TResponse>(ReplyAddress address, ReplyEnvelope<TResponse> reply, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-
-        var responseBody = _serializer.Serialize(reply);
-        if (reply.Success)
-        {
-            await _requestStore.MarkCompletedAsync(reply.RequestId, responseBody, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        else
-        {
-            await _requestStore.MarkFailedAsync(
-                    reply.RequestId,
-                    reply.ErrorCode ?? "REQUEST_FAILED",
-                    reply.ErrorMessage ?? "Request handler returned a failure reply.",
-                    cancellationToken)
-                .ConfigureAwait(false);
-        }
 
         if (_waiters.TryRemove(reply.RequestId, out var waiter))
         {
             waiter.TrySetResult(reply);
-            return;
+            return Task.CompletedTask;
         }
 
         _completedReplies[reply.RequestId] = reply;
@@ -73,6 +51,8 @@ public sealed class InMemoryReplyTransport : IReplyTransport
                 reply.RequestId,
                 address);
         }
+
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
@@ -98,6 +78,15 @@ public sealed class InMemoryReplyTransport : IReplyTransport
             _waiters.TryRemove(context.RequestId, out _);
             throw;
         }
+    }
+
+    /// <inheritdoc />
+    public Task AbandonAsync(RequestContext context, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _waiters.TryRemove(context.RequestId, out _);
+        _completedReplies.TryRemove(context.RequestId, out _);
+        return Task.CompletedTask;
     }
 
     private static ReplyEnvelope<TResponse> CastReply<TResponse>(string requestId, object reply)

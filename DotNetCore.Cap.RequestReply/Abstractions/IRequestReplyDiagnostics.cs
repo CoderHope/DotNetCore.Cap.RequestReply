@@ -27,6 +27,12 @@ public interface IRequestReplyDiagnostics
     void MarkTimeout(RequestContext context);
 
     /// <summary>
+    /// 标记调用方通过 <see cref="CancellationToken"/> 主动取消请求。
+    /// </summary>
+    /// <param name="context">请求上下文。</param>
+    void MarkCanceled(RequestContext context);
+
+    /// <summary>
     /// 标记请求失败。
     /// </summary>
     /// <param name="context">请求上下文。</param>

@@ -39,6 +39,13 @@ public interface IRequestStore
     Task MarkTimeoutAsync(string requestId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 将请求标记为调用方主动取消。
+    /// </summary>
+    /// <param name="requestId">请求 ID。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    Task MarkCanceledAsync(string requestId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 根据 RequestId 查询请求状态。
     /// </summary>
     /// <param name="requestId">请求 ID。</param>

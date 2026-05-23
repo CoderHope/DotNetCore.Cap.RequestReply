@@ -139,6 +139,29 @@ public sealed class PostgreSqlRequestStore : IRequestStore
     }
 
     /// <inheritdoc />
+    public async Task MarkCanceledAsync(string requestId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(requestId);
+        cancellationToken.ThrowIfCancellationRequested();
+        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+
+        var sql = $"""
+                   UPDATE {GetTableName()}
+                   SET "StatusName" = @CanceledStatus
+                   WHERE "RequestId" = @RequestId
+                     AND "StatusName" = @PendingStatus;
+                   """;
+
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = new NpgsqlCommand(sql, connection);
+        Add(command, "RequestId", requestId);
+        Add(command, "PendingStatus", PendingRequestStatus.Pending.ToString());
+        Add(command, "CanceledStatus", PendingRequestStatus.Canceled.ToString());
+
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<PendingRequest?> GetAsync(string requestId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(requestId);

@@ -1,6 +1,5 @@
 using DotNetCore.CAP;
 using DotNetCore.Cap.RequestReply.Abstractions;
-using DotNetCore.Cap.RequestReply.Core;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DotNetCore.Cap.RequestReply.Extensions;
