@@ -8,7 +8,19 @@
         <Version>10.0.1</Version>
         <Title>DotNetCore.Cap.RequestReply</Title>
         <AssemblyVersion>10.0.1</AssemblyVersion>
+        <PackageId>DotNetCore.Cap.RequestReply</PackageId>
+        <Authors>CoderHope</Authors>
+        <Description>Request/Reply extension for DotNetCore.CAP.</Description>
+        <PackageTags>CAP;RequestReply;Messaging;Redis;PostgreSQL;MySQL</PackageTags>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/CoderHope/DotNetCore.Cap.RequestReply</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/CoderHope/DotNetCore.Cap.RequestReply.git</RepositoryUrl>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\README.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
 
     <ItemGroup>
       <PackageReference Include="DotNetCore.CAP" Version="10.0.1" />
