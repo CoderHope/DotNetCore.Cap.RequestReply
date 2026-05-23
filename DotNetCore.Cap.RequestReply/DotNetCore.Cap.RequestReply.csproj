@@ -9,6 +9,8 @@
 
     <ItemGroup>
       <PackageReference Include="DotNetCore.CAP" Version="10.0.1" />
+      <PackageReference Include="MySqlConnector" Version="2.5.0" />
+      <PackageReference Include="Npgsql" Version="9.0.4" />
       <PackageReference Include="StackExchange.Redis" Version="2.9.32" />
     </ItemGroup>
 

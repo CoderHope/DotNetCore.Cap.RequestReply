@@ -39,9 +39,21 @@ public sealed class RedisReplyOptions
     public string StreamPrefix { get; set; } = "cap:reply";
 
     /// <summary>
-    /// Stream 最大近似长度，用于限制历史回复堆积。
+    /// Stream 最大近似长度，用于限制单 Key 内历史回复条数（XADD MAXLEN ~）。
+    /// 不会删除 Stream Key 本身，需配合 <see cref="StreamKeyExpire"/>。
     /// </summary>
     public int MaxStreamLength { get; set; } = 10000;
+
+    /// <summary>
+    /// Reply Stream Key 的过期时间（滑动续期：每次写入或等待读时刷新）。
+    /// 设为 <see cref="TimeSpan.Zero"/> 表示不设置 EXPIRE（不推荐生产环境）。
+    /// </summary>
+    public TimeSpan StreamKeyExpire { get; set; } = TimeSpan.FromHours(1);
+
+    /// <summary>
+    /// 调用方成功读取匹配的回复后，是否从 Stream 中删除该条消息（XDEL）。
+    /// </summary>
+    public bool DeleteEntryAfterConsume { get; set; } = true;
 
     /// <summary>
     /// 每次 XREAD 最多读取的消息数量。
