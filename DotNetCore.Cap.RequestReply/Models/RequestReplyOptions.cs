@@ -46,11 +46,6 @@ public sealed class RequestReplyOptions
     public MySqlReplyOptions MySqlReply { get; } = new();
 
     /// <summary>
-    /// IPC ReplyTransport 配置。
-    /// </summary>
-    public IpcReplyOptions Ipc { get; } = new();
-
-    /// <summary>
     /// PostgreSQL PendingRequestStore 配置。
     /// </summary>
     public PostgreSqlStoreOptions PostgreSqlStore { get; } = new();
@@ -96,16 +91,6 @@ public sealed class RequestReplyOptions
     {
         ReplyTransport = RequestReplyTransportKind.MySql;
         configure?.Invoke(MySqlReply);
-    }
-
-    /// <summary>
-    /// 使用 IPC 响应通道。
-    /// </summary>
-    /// <param name="configure">IPC 配置委托。</param>
-    public void UseIpcReply(Action<IpcReplyOptions>? configure = null)
-    {
-        ReplyTransport = RequestReplyTransportKind.Ipc;
-        configure?.Invoke(Ipc);
     }
 
     /// <summary>

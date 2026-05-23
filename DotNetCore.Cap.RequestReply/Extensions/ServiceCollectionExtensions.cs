@@ -74,9 +74,12 @@ public static class ServiceCollectionExtensions
             RequestReplyTransportKind.Redis => ActivatorUtilities.CreateInstance<RedisStreamReplyTransport>(
                 serviceProvider,
                 GetLogger<RedisStreamReplyTransport>(serviceProvider)),
-            RequestReplyTransportKind.PostgreSql => throw NotImplemented("PostgreSQL reply transport"),
-            RequestReplyTransportKind.MySql => throw NotImplemented("MySQL reply transport"),
-            RequestReplyTransportKind.Ipc => throw NotImplemented("IPC reply transport"),
+            RequestReplyTransportKind.PostgreSql => ActivatorUtilities.CreateInstance<PostgreSqlReplyTransport>(
+                serviceProvider,
+                GetLogger<PostgreSqlReplyTransport>(serviceProvider)),
+            RequestReplyTransportKind.MySql => ActivatorUtilities.CreateInstance<MySqlReplyTransport>(
+                serviceProvider,
+                GetLogger<MySqlReplyTransport>(serviceProvider)),
             _ => throw new InvalidOperationException($"Unsupported reply transport '{options.ReplyTransport}'.")
         };
     }
@@ -84,10 +87,5 @@ public static class ServiceCollectionExtensions
     private static ILogger<T> GetLogger<T>(IServiceProvider serviceProvider)
     {
         return serviceProvider.GetService<ILogger<T>>() ?? NullLogger<T>.Instance;
-    }
-
-    private static NotImplementedException NotImplemented(string feature)
-    {
-        return new NotImplementedException($"{feature} is planned but not implemented in this foundation build.");
     }
 }

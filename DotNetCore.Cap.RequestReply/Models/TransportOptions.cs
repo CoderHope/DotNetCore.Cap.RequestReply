@@ -77,6 +77,26 @@ public sealed class PostgreSqlReplyOptions
     public string ConnectionString { get; set; } = string.Empty;
 
     /// <summary>
+    /// PostgreSQL schema 名称。
+    /// </summary>
+    public string Schema { get; set; } = "cap";
+
+    /// <summary>
+    /// 存放 Reply 消息正文的表名（与 PendingRequestStore 表相互独立）。
+    /// </summary>
+    public string TableName { get; set; } = "request_reply_inbox";
+
+    /// <summary>
+    /// NOTIFY 通道名前缀；完整通道名为 <c>{NotifyChannelPrefix}_{ServiceName}_{InstanceId}</c>（会做合法化截断）。
+    /// </summary>
+    public string NotifyChannelPrefix { get; set; } = "cap_reply";
+
+    /// <summary>
+    /// 是否在首次使用时自动创建 Reply 表。
+    /// </summary>
+    public bool AutoCreateTable { get; set; } = true;
+
+    /// <summary>
     /// 是否优先使用 LISTEN/NOTIFY。
     /// </summary>
     public bool UseNotify { get; set; } = true;
@@ -85,6 +105,11 @@ public sealed class PostgreSqlReplyOptions
     /// NOTIFY 不可用或丢失时的轮询兜底间隔。
     /// </summary>
     public TimeSpan PollingFallbackInterval { get; set; } = TimeSpan.FromMilliseconds(300);
+
+    /// <summary>
+    /// 调用方成功读取回复后是否删除 Inbox 表中的记录。
+    /// </summary>
+    public bool DeleteAfterConsume { get; set; } = true;
 }
 
 /// <summary>
@@ -98,6 +123,31 @@ public sealed class MySqlReplyOptions
     public string ConnectionString { get; set; } = string.Empty;
 
     /// <summary>
+    /// MySQL 表名前缀，默认与 CAP MySQL 存储一致使用 cap。
+    /// </summary>
+    public string TableNamePrefix { get; set; } = "cap";
+
+    /// <summary>
+    /// 存放 Reply 消息正文的表名（与 PendingRequestStore 表相互独立）。
+    /// </summary>
+    public string TableName { get; set; } = "request_reply_inbox";
+
+    /// <summary>
+    /// Inbox 键前缀；完整键名为 <c>{InboxKeyPrefix}_{ServiceName}_{InstanceId}</c>（会做合法化截断）。
+    /// </summary>
+    public string InboxKeyPrefix { get; set; } = "cap_reply";
+
+    /// <summary>
+    /// 是否在首次使用时自动创建 Reply 表。
+    /// </summary>
+    public bool AutoCreateTable { get; set; } = true;
+
+    /// <summary>
+    /// 调用方成功读取回复后是否删除 Inbox 表中的记录。
+    /// </summary>
+    public bool DeleteAfterConsume { get; set; } = true;
+
+    /// <summary>
     /// 初始轮询间隔。
     /// </summary>
     public TimeSpan InitialPollingInterval { get; set; } = TimeSpan.FromMilliseconds(100);
@@ -106,22 +156,6 @@ public sealed class MySqlReplyOptions
     /// 最大轮询间隔。
     /// </summary>
     public TimeSpan MaxPollingInterval { get; set; } = TimeSpan.FromSeconds(1);
-}
-
-/// <summary>
-/// IPC 响应通道配置。
-/// </summary>
-public sealed class IpcReplyOptions
-{
-    /// <summary>
-    /// 本机监听地址。
-    /// </summary>
-    public string Host { get; set; } = "127.0.0.1";
-
-    /// <summary>
-    /// 本机监听端口。
-    /// </summary>
-    public int Port { get; set; } = 39001;
 }
 
 /// <summary>

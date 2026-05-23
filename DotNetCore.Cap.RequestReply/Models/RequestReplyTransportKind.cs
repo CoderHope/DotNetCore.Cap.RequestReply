@@ -23,10 +23,5 @@ public enum RequestReplyTransportKind
     /// <summary>
     /// MySQL 响应通道。
     /// </summary>
-    MySql,
-
-    /// <summary>
-    /// 本机 IPC 响应通道。
-    /// </summary>
-    Ipc
+    MySql
 }
