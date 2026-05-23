@@ -28,10 +28,5 @@ public enum RequestReplyTransportKind
     /// <summary>
     /// 本机 IPC 响应通道。
     /// </summary>
-    Ipc,
-
-    /// <summary>
-    /// CAP callbackName 响应通道。
-    /// </summary>
-    CapCallback
+    Ipc
 }

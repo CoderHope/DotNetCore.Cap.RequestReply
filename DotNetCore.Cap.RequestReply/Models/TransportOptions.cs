@@ -95,22 +95,6 @@ public sealed class IpcReplyOptions
 }
 
 /// <summary>
-/// CAP callbackName 响应通道配置。
-/// </summary>
-public sealed class CapCallbackReplyOptions
-{
-    /// <summary>
-    /// CAP 回调主题；为空时按服务名自动生成。
-    /// </summary>
-    public string CallbackTopic { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 从 PendingRequestStore 等待 callback 写回结果时的轮询间隔。
-    /// </summary>
-    public TimeSpan PollingInterval { get; set; } = TimeSpan.FromMilliseconds(200);
-}
-
-/// <summary>
 /// PostgreSQL PendingRequestStore 配置。
 /// </summary>
 public sealed class PostgreSqlStoreOptions

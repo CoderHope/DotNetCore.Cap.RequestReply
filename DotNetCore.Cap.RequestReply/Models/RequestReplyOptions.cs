@@ -51,11 +51,6 @@ public sealed class RequestReplyOptions
     public IpcReplyOptions Ipc { get; } = new();
 
     /// <summary>
-    /// CAP callbackName ReplyTransport 配置。
-    /// </summary>
-    public CapCallbackReplyOptions CapCallback { get; } = new();
-
-    /// <summary>
     /// PostgreSQL PendingRequestStore 配置。
     /// </summary>
     public PostgreSqlStoreOptions PostgreSqlStore { get; } = new();
@@ -111,16 +106,6 @@ public sealed class RequestReplyOptions
     {
         ReplyTransport = RequestReplyTransportKind.Ipc;
         configure?.Invoke(Ipc);
-    }
-
-    /// <summary>
-    /// 使用 CAP callbackName 响应通道。
-    /// </summary>
-    /// <param name="configure">CAP callback 配置委托。</param>
-    public void UseCapCallbackReply(Action<CapCallbackReplyOptions>? configure = null)
-    {
-        ReplyTransport = RequestReplyTransportKind.CapCallback;
-        configure?.Invoke(CapCallback);
     }
 
     /// <summary>
