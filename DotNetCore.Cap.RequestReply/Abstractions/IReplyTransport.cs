@@ -8,7 +8,7 @@ namespace DotNetCore.Cap.RequestReply.Abstractions;
 public interface IReplyTransport
 {
     /// <summary>
-    /// 传输名称，会写入 <c>x-reply-transport</c> Header。
+    /// 传输名称，会写入 <c>cap-request-reply-transport</c> Header。
     /// </summary>
     string Name { get; }
 
