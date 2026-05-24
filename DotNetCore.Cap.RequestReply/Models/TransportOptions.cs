@@ -123,7 +123,8 @@ public sealed class MySqlReplyOptions
     public string ConnectionString { get; set; } = string.Empty;
 
     /// <summary>
-    /// MySQL 表名前缀，默认与 CAP MySQL 存储一致使用 cap。
+    /// MySQL 表名前缀（与 CAP MySQL 存储一致，例如 <c>cap.request_reply</c> 整段作为表名，不是 database.table）。
+    /// 留空则仅使用 <see cref="TableName"/>。
     /// </summary>
     public string TableNamePrefix { get; set; } = "cap";
 
@@ -195,7 +196,8 @@ public sealed class MySqlStoreOptions
     public string ConnectionString { get; set; } = string.Empty;
 
     /// <summary>
-    /// MySQL 表名前缀，默认与 CAP MySQL 存储一致使用 cap。
+    /// MySQL 表名前缀（与 CAP MySQL 存储一致，例如 <c>cap.request_reply</c> 整段作为表名，不是 database.table）。
+    /// 留空则仅使用 <see cref="TableName"/>。
     /// </summary>
     public string TableNamePrefix { get; set; } = "cap";
 

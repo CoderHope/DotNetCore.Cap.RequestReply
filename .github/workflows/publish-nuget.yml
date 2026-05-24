@@ -1,0 +1,62 @@
+name: Publish NuGet to NuGet.org
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version (empty = use Version in csproj)"
+        required: false
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Resolve package version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
+            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "value=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore
+        run: dotnet restore DotNetCore.Cap.RequestReply/DotNetCore.Cap.RequestReply.csproj
+
+      - name: Build
+        run: dotnet build DotNetCore.Cap.RequestReply/DotNetCore.Cap.RequestReply.csproj -c Release --no-restore
+
+      - name: Pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            DotNetCore.Cap.RequestReply/DotNetCore.Cap.RequestReply.csproj
+            -c Release
+            --no-build
+            -o ./artifacts
+            /p:ContinuousIntegrationBuild=true
+          )
+          if [ -n "${{ steps.version.outputs.value }}" ]; then
+            args+=(/p:Version="${{ steps.version.outputs.value }}")
+          fi
+          dotnet pack "${args[@]}"
+
+      - name: Push to NuGet.org
+        run: dotnet nuget push "./artifacts/*.nupkg" --source "https://api.nuget.org/v3/index.json" --api-key "${{ secrets.NUGET_API_KEY }}" --skip-duplicate
